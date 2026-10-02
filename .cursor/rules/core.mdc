@@ -1,0 +1,24 @@
+---
+description: Ядро «Мой питомец Мурзик» — стек, токены, процесс качества, принятие правил
+alwaysApply: true
+---
+
+# Мой питомец Мурзик
+
+Детская игра-питомец для iPhone, 3–7 лет. Сборка в Xcode, только реальные API Apple. Концепция — `concept/gdd.md`. Выжимка — `knowledge/`. При расхождении верна концепция.
+
+## Стек
+iOS 15.0+, iPhone, портрет. Swift 5.9, SwiftUI + SpriteKit (`SpriteView`). MVVM. Экранные модели — `ObservableObject` / `@Published`. `@Observable` не использовать. Настройки — `@AppStorage`. Состояние питомца — SwiftData, запасной путь — Core Data. StoreKit 2. Реклама только rewarded, детская (G, `tagForChildDirectedTreatment`). Firebase Analytics без персонализации и без IDFA. Логика шкал, рецептов и лимитов — без SwiftUI, с XCTest. Без `try!` и force unwrap. Текст — `String(localized:)`, русский. Звук — `.ambient`.
+
+## Токены
+Фон `#FFF6EA`, текст и контур `#5B3A29`, розовый `#FF6FA5`, мятный `#7FD8BE`, жёлтый `#FFD34D`, голубой `#7FB5F0`. В коде — `AppColors` / `AppFonts` / `AppMetrics`, не россыпь hex. Шрифты Fredoka и Nunito. Детская кнопка ≥ 64 pt, системная ≥ 44 pt. Пружина `spring(response: 0.4, dampingFraction: 0.6)`. Тёмной темы нет.
+
+## Процесс
+Одна задача = один `documents/backlog/*_work.md`. Карта — `documents/function_registry.md`. UI не выдумывать мимо концепции. Симулятор — вёрстка. Жесты, сон в фоне, StoreKit и реклама — на устройстве.
+
+**Ревьюер** — один `Task(code-reviewer)` за ход, только по followup хука `stop` (файлы из `review_hashes.py filter`). Ask, Plan, чтение и грязный git без правок в этом ходе — не запускай Task и не пиши рефлексию. Повторный запуск в том же ходе — только после правки по предыдущему ревью. Docs, `pbxproj`, `.cursor/` — не ревьюить. Critical — минимальный патч; Warnings перечисли. После отчёта: `python3 .cursor/hooks/review_hashes.py record`. Предложения правил — только `.cursor/reflections/pending.md`.
+
+Правила в `.cursor/rules/` — только по фразе «принять правило N» / «принять все» / «отклонить N».
+
+## Детская зона
+Нет чата, произвольных ссылок, IDFA и покупок вне родительской зоны. Реклама не подменяет основную кнопку. Имя питомца в озвучке — из двух частей (обращение + предикат), не `name.prefix`.

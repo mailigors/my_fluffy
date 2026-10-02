@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/session-start.py"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/reset-pending-edits.py"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/after-file-edit.py",
+        "matcher": "Write|StrReplace|ApplyPatch"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/stop-review-reflect.py",
+        "loop_limit": 1
+      }
+    ]
+  }
+}
