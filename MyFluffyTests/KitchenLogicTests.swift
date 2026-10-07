@@ -52,6 +52,10 @@ final class KitchenLogicTests: XCTestCase {
         XCTAssertEqual(KitchenDishVisual.artName(for: [.fish, .cheese]), "kitchen_dish_fish")
         XCTAssertEqual(KitchenDishVisual.artName(for: [.chicken, .herb]), "kitchen_dish_chicken")
         XCTAssertEqual(KitchenDishVisual.artName(for: [.rice, .rice]), "kitchen_dish_mixed")
+        XCTAssertEqual(KitchenDishVisual.artName(for: [.apple, .oats]), "kitchen_dish_pie")
+        XCTAssertEqual(KitchenDishVisual.artName(for: [.banana, .yogurt]), "kitchen_dish_milkshake")
+        XCTAssertEqual(KitchenDishVisual.artName(for: [.pumpkin, .potato]), "kitchen_dish_soup")
+        XCTAssertEqual(KitchenDishVisual.artName(for: [.broccoli, .peas]), "kitchen_dish_salad")
     }
 
     func testWaterMustBeWarmAndEveryIngredientWashed() {

@@ -25,8 +25,10 @@ struct StartView: View {
                 VStack(spacing: 2) {
                     Text(String(localized: "Мой питомец"))
                         .font(AppFonts.heading(26))
-                    Text(String(localized: "Мурзик"))
+                    Text(model.petName)
                         .font(AppFonts.heading(38))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 .foregroundStyle(AppColors.ink)
                 .padding(.horizontal, 28)

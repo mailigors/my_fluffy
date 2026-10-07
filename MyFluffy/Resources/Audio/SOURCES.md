@@ -18,3 +18,5 @@ Feeding uses the existing `mrr_meow` cat cue at a quieter volume.
 `faucet_open.caf` and `water_loop.caf` are original procedural sounds created for the kitchen. The faucet now uses only smooth muted tones, without a noisy click. The water loop uses filtered noise and is crossfaded at its seam. `music_day.caf` is an original gentle music-box melody that loops across the start screen, room and kitchen at a low playback volume. Run `python3 tools/generate_kitchen_audio.py` to regenerate the faucet, water and music WAV sources. No third-party recording is used for these files.
 
 `cooking_sizzle.caf` is a quiet original filtered frying loop with smooth small bubbles. It plays only while ingredients are frying in the green heat zone. The same generator script rebuilds it.
+
+`game_*.caf` are original short synthesized cues for fish, clouds, puzzle, memory, tic-tac-toe, beaver, win/loss, and toilet flushing. Run `python3 tools/generate_game_audio.py` and convert the generated `/private/tmp/game_*.wav` files with `afconvert -f caff -d LEI16` to rebuild them. No third-party recordings are used.

@@ -5,6 +5,8 @@ struct StoredPet: Equatable, Sendable {
     var needs: PetNeeds
     var isSleeping: Bool
     var kitchen: KitchenState = .newcomer
+    var playProgress: PlayProgress = PlayProgress()
+    var shop: ShopState = ShopState()
 }
 
 enum PetStoreError: Error, Equatable {
@@ -82,6 +84,8 @@ final class PetStore {
                 record.lastCalculated = pet.needs.lastCalculated
                 record.isSleeping = pet.isSleeping
                 record.kitchenData = try JSONEncoder().encode(pet.kitchen)
+                record.playData = try JSONEncoder().encode(pet.playProgress)
+                record.shopData = try JSONEncoder().encode(pet.shop)
                 if context.hasChanges {
                     try context.save()
                 }
@@ -105,7 +109,9 @@ final class PetStore {
             attribute("toilet", .doubleAttributeType),
             attribute("lastCalculated", .dateAttributeType),
             attribute("isSleeping", .booleanAttributeType),
-            optionalAttribute("kitchenData", .binaryDataAttributeType)
+            optionalAttribute("kitchenData", .binaryDataAttributeType),
+            optionalAttribute("playData", .binaryDataAttributeType),
+            optionalAttribute("shopData", .binaryDataAttributeType)
         ]
         model.entities = [entity]
         return model
@@ -136,6 +142,8 @@ final class PetRecord: NSManagedObject {
     @NSManaged var lastCalculated: Date
     @NSManaged var isSleeping: Bool
     @NSManaged var kitchenData: Data?
+    @NSManaged var playData: Data?
+    @NSManaged var shopData: Data?
 
     @nonobjc class func fetchRequest() -> NSFetchRequest<PetRecord> {
         NSFetchRequest<PetRecord>(entityName: "PetRecord")
@@ -154,5 +162,7 @@ private extension StoredPet {
         )
         isSleeping = record.isSleeping
         kitchen = record.kitchenData.flatMap { try? JSONDecoder().decode(KitchenState.self, from: $0) } ?? .newcomer
+        playProgress = record.playData.flatMap { try? JSONDecoder().decode(PlayProgress.self, from: $0) } ?? PlayProgress()
+        shop = record.shopData.flatMap { try? JSONDecoder().decode(ShopState.self, from: $0) } ?? ShopState()
     }
 }

@@ -11,12 +11,24 @@ struct RoomView: View {
         ZStack {
             AppColors.background.ignoresSafeArea()
             RoomBackdrop(night: model.nightVisible)
-            if ArtImage.named("room_night") == nil {
+                .ignoresSafeArea()
+            if ArtImage.named("room_night_clean") == nil {
                 NightCover(visible: model.nightVisible)
             }
+            RoomOwnedDecor(shop: model.shop, night: model.nightVisible)
+                .ignoresSafeArea()
             VStack(spacing: 12) {
                 HStack {
-                    Color.clear.frame(width: AppMetrics.childButton, height: AppMetrics.childButton)
+                    if !model.isSleeping && !model.isFeeding {
+                        FluffyIconButton(
+                            symbol: "bag.fill",
+                            fallback: "bag",
+                            label: "Магазин",
+                            action: { model.openShop() }
+                        )
+                    } else {
+                        Color.clear.frame(width: AppMetrics.childButton, height: AppMetrics.childButton)
+                    }
                     Spacer(minLength: 0)
                     Text(model.petName)
                         .font(AppFonts.heading())
@@ -38,7 +50,12 @@ struct RoomView: View {
             VStack {
                 HStack(spacing: 12) {
                     ForEach(CareAccess.blinkingNeeds(for: model.needs), id: \.self) { need in
-                        BlinkingNeedIcon(need: need)
+                        if need == .toilet {
+                            Button { model.openToilet() } label: { BlinkingNeedIcon(need: need).frame(width: 64, height: 64) }
+                                .accessibilityLabel(Text("Убрать лоток"))
+                        } else {
+                            BlinkingNeedIcon(need: need)
+                        }
                     }
                 }
                 .padding(.bottom, 220)
@@ -48,11 +65,15 @@ struct RoomView: View {
                 cat
                 Color.clear.frame(height: 108)
             }
+            RoomToyField(shop: model.shop, night: model.nightVisible, play: model.playWithToy)
+                .ignoresSafeArea()
             if model.isSleeping == false && model.isFeeding == false && model.showsSleepPrompt == false {
                 VStack {
                     Spacer()
-                    HStack(spacing: 28) {
+                    HStack(spacing: 12) {
                         roomAction("fork.knife", label: String(localized: "Кухня")) { model.openKitchen() }
+                        roomAction("drop.fill", label: "Купание") { model.openBath() }
+                        roomAction("gamecontroller.fill", label: "Игры") { model.openPlayMenu() }
                         if model.canSleep { sleepButton }
                     }
                         .padding(.bottom, 28)
@@ -84,15 +105,23 @@ struct RoomView: View {
             }
         }
         .onAppear {
+            stage.scene.setReduceMotion(reduceMotion)
             stage.scene.setLook(model.look)
+            stage.scene.setOutfit(model.shop)
         }
         .onChange(of: model.look) { look in
             stage.scene.setLook(look)
         }
+        .onChange(of: reduceMotion) { enabled in
+            stage.scene.setReduceMotion(enabled)
+        }
+        .onChange(of: model.shop) { shop in
+            stage.scene.setOutfit(shop)
+        }
     }
 
     private var nameColor: Color {
-        if model.nightVisible, ArtImage.named("room_night") == nil {
+        if model.nightVisible, ArtImage.named("room_night_clean") == nil {
             return AppColors.yellow
         }
         return AppColors.ink
@@ -112,6 +141,7 @@ struct RoomView: View {
             hearts
         }
         .frame(width: 280, height: 280)
+        .offset(y: model.isSleeping ? -35 : 0)
         .contentShape(Rectangle())
         .gesture(petGesture)
         .accessibilityLabel(Text(String(localized: "Котёнок")))
@@ -192,8 +222,8 @@ struct RoomBackdrop: View {
 
     var body: some View {
         ZStack {
-            picture("room_day")
-            picture("room_night")
+            picture("room_day_clean")
+            picture("room_night_clean")
                 .opacity(night ? 1 : 0)
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: AppMetrics.nightFade), value: night)

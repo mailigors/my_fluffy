@@ -1,6 +1,24 @@
 import AVFoundation
 import Foundation
 
+enum GameCue: String, CaseIterable {
+    case catchFish = "game_fish"
+    case gold = "game_gold"
+    case jump = "game_jump"
+    case miss = "game_miss"
+    case select = "game_select"
+    case match = "game_match"
+    case move = "game_move"
+    case hit = "game_hit"
+    case win = "game_win"
+    case lose = "game_lose"
+    case flush = "game_flush"
+    case hockeyHit = "game_hockey_hit"
+    case hockeyGoal = "game_hockey_goal"
+    case toyShot = "game_toy_shot"
+    case toyPop = "game_toy_pop"
+}
+
 enum BundleFile {
     static func url(name: String, extension ext: String, subdirectory: String) -> URL? {
         guard let root = Bundle(for: PetStore.self).resourceURL else { return nil }
@@ -28,6 +46,7 @@ protocol SoundPlaying: AnyObject {
     func startSnore()
     func stopSnore()
     func playFaucetOpen()
+    func playBubblePop(variant: Int)
     func startWater()
     func stopWater()
     func startSizzle()
@@ -35,26 +54,51 @@ protocol SoundPlaying: AnyObject {
     func startMusic()
     func stopMusic()
     func setMusicQuiet(_ quiet: Bool)
+    func speak(_ phrase: String)
+    func stopSpeech()
+    func playGameCue(_ cue: GameCue)
+    func setMix(effects: Double, music: Double, voice: Double)
+}
+
+extension SoundPlaying {
+    func setMix(effects: Double, music: Double, voice: Double) {}
 }
 
 final class BundleSoundPlayer: SoundPlaying {
-    var effectsEnabled = true
+    var effectsEnabled = true {
+        didSet {
+            if !effectsEnabled {
+                stopWater()
+                stopSizzle()
+                purrPlayer?.stop()
+                snorePlayer?.stop()
+                speechSynthesizer.stopSpeaking(at: .immediate)
+            }
+        }
+    }
 
     private let volume: Float = 0.45
     private let sleepVolume: Float = 0.18
     private let waterVolume: Float = 0.12
     private let sizzleVolume: Float = 0.16
-    private let musicVolume: Float = 0.04
+    private let musicVolume: Float = 0.12
     private var meowPlayer: AVAudioPlayer?
     private var happyPlayer: AVAudioPlayer?
     private var eatingPlayer: AVAudioPlayer?
     private var purrPlayer: AVAudioPlayer?
     private var snorePlayer: AVAudioPlayer?
     private var faucetPlayer: AVAudioPlayer?
+    private var bubblePlayers: [AVAudioPlayer?] = Array(repeating: nil, count: 4)
     private var waterPlayer: AVAudioPlayer?
     private var sizzlePlayer: AVAudioPlayer?
     private var musicPlayer: AVAudioPlayer?
+    private var gamePlayers: [GameCue: AVAudioPlayer] = [:]
+    var isMusicPlaying: Bool { musicPlayer?.isPlaying == true }
+    private let speechSynthesizer = AVSpeechSynthesizer()
     private var musicQuiet = false
+    private var effectsLevel: Float = 1
+    private var musicLevel: Float = 1
+    private var voiceLevel: Float = 1
     private var musicToken = 0
     private var purrToken = 0
     private var snoreToken = 0
@@ -63,6 +107,18 @@ final class BundleSoundPlayer: SoundPlaying {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.ambient, mode: .default)
         try? session.setActive(true)
+    }
+
+    func setMix(effects: Double, music: Double, voice: Double) {
+        effectsLevel = Float(min(1, max(0, effects)))
+        musicLevel = Float(min(1, max(0, music)))
+        voiceLevel = Float(min(1, max(0, voice)))
+        let musicTarget = musicVolume * musicLevel * (musicQuiet ? 0.45 : 1)
+        musicPlayer?.setVolume(musicTarget, fadeDuration: 0.15)
+        waterPlayer?.volume = waterVolume * effectsLevel
+        sizzlePlayer?.volume = sizzleVolume * effectsLevel
+        purrPlayer?.volume = volume * effectsLevel
+        snorePlayer?.volume = sleepVolume * effectsLevel
     }
 
     func playMeow() {
@@ -109,12 +165,25 @@ final class BundleSoundPlayer: SoundPlaying {
         playOnce(&faucetPlayer, named: "faucet_open", playbackVolume: 0.15)
     }
 
+    func playBubblePop(variant: Int) {
+        guard effectsEnabled else { return }
+        let index = abs(variant) % bubblePlayers.count
+        if bubblePlayers[index] == nil {
+            bubblePlayers[index] = makePlayer(named: "bubble_pop_\(index + 1)")
+        }
+        guard let player = bubblePlayers[index] else { return }
+        player.stop()
+        player.currentTime = 0
+        player.volume = 0.2 * effectsLevel
+        player.play()
+    }
+
     func startWater() {
         guard effectsEnabled else { return }
         if waterPlayer == nil { waterPlayer = makePlayer(named: "water_loop") }
         guard let waterPlayer, !waterPlayer.isPlaying else { return }
         waterPlayer.numberOfLoops = -1
-        waterPlayer.volume = waterVolume
+        waterPlayer.volume = waterVolume * effectsLevel
         waterPlayer.currentTime = 0
         waterPlayer.play()
     }
@@ -129,7 +198,7 @@ final class BundleSoundPlayer: SoundPlaying {
         if sizzlePlayer == nil { sizzlePlayer = makePlayer(named: "cooking_sizzle") }
         guard let sizzlePlayer, !sizzlePlayer.isPlaying else { return }
         sizzlePlayer.numberOfLoops = -1
-        sizzlePlayer.volume = sizzleVolume
+        sizzlePlayer.volume = sizzleVolume * effectsLevel
         sizzlePlayer.currentTime = 0
         sizzlePlayer.play()
     }
@@ -141,9 +210,10 @@ final class BundleSoundPlayer: SoundPlaying {
 
     func startMusic() {
         musicToken += 1
+        if !isMusicPlaying { prepareSession() }
         if musicPlayer == nil { musicPlayer = makePlayer(named: "music_day") }
         guard let musicPlayer else { return }
-        let target = musicQuiet ? musicVolume * 0.45 : musicVolume
+        let target = musicVolume * musicLevel * (musicQuiet ? 0.45 : 1)
         if musicPlayer.isPlaying {
             musicPlayer.setVolume(target, fadeDuration: 0.5)
             return
@@ -169,7 +239,32 @@ final class BundleSoundPlayer: SoundPlaying {
 
     func setMusicQuiet(_ quiet: Bool) {
         musicQuiet = quiet
-        musicPlayer?.setVolume(quiet ? musicVolume * 0.45 : musicVolume, fadeDuration: 1.0)
+        musicPlayer?.setVolume(musicVolume * musicLevel * (quiet ? 0.45 : 1), fadeDuration: 1.0)
+    }
+
+    func speak(_ phrase: String) {
+        guard effectsEnabled else { return }
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: phrase)
+        utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
+        utterance.rate = 0.46
+        utterance.pitchMultiplier = 1.08
+        utterance.volume = 0.7 * voiceLevel
+        speechSynthesizer.speak(utterance)
+    }
+
+    func stopSpeech() {
+        speechSynthesizer.stopSpeaking(at: .immediate)
+    }
+
+    func playGameCue(_ cue: GameCue) {
+        guard effectsEnabled else { return }
+        if gamePlayers[cue] == nil { gamePlayers[cue] = makePlayer(named: cue.rawValue) }
+        guard let player = gamePlayers[cue] else { return }
+        player.stop()
+        player.currentTime = 0
+        player.volume = (cue == .flush ? 0.18 : 0.24) * effectsLevel
+        player.play()
     }
 
     private func playOnce(_ player: inout AVAudioPlayer?, named name: String, playbackVolume: Float? = nil) {
@@ -181,7 +276,7 @@ final class BundleSoundPlayer: SoundPlaying {
         player.numberOfLoops = 0
         player.stop()
         player.currentTime = 0
-        player.volume = playbackVolume ?? volume
+        player.volume = (playbackVolume ?? volume) * effectsLevel
         player.play()
     }
 
@@ -198,7 +293,7 @@ final class BundleSoundPlayer: SoundPlaying {
         }
         guard let player else { return }
         player.numberOfLoops = -1
-        player.volume = playbackVolume ?? volume
+        player.volume = (playbackVolume ?? volume) * effectsLevel
         if player.isPlaying {
             return
         }

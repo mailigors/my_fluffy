@@ -5,9 +5,10 @@ struct KitchenView: View {
     @State private var lastWashPoint: CGPoint?
     @State private var lastStirPoint: CGPoint?
     @State private var stirPoint: CGPoint?
+    @State private var didWarnForStirGesture = false
     @State private var isCutting = false
     @State private var showSlices = false
-    @State private var slicedFood = ""
+    @State private var slicedFood: Ingredient?
     @State private var showsRestock = false
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
     private let toppingColumns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
@@ -128,7 +129,7 @@ struct KitchenView: View {
                             model.restockIngredient(ingredient)
                         } label: {
                             VStack(spacing: 4) {
-                                Text(ingredient.emoji).font(.system(size: 34))
+                                KitchenIngredientArt(ingredient: ingredient, size: 48)
                                 Text("×\(model.kitchen.available(ingredient))")
                                     .font(AppFonts.body(15))
                                 Text("+3").font(AppFonts.action)
@@ -160,7 +161,7 @@ struct KitchenView: View {
     private func ingredientButton(_ ingredient: Ingredient) -> some View {
         Button { model.addIngredient(ingredient) } label: {
             VStack(spacing: 2) {
-                Text(ingredient.emoji).font(.system(size: 32))
+                KitchenIngredientArt(ingredient: ingredient, size: 43)
                 Text("×\(model.kitchen.available(ingredient))")
                     .font(AppFonts.body(15))
                     .foregroundStyle(AppColors.ink)
@@ -177,7 +178,7 @@ struct KitchenView: View {
 
     private var bowl: some View {
         VStack(spacing: 4) {
-            KitchenBowlIllustration(food: model.kitchenSession.selected.map(\.emoji).joined(separator: " "))
+            KitchenBowlIllustration(ingredients: model.kitchenSession.selected)
                 .frame(height: 100)
             Text(String(localized: "В миске: \(model.kitchenSession.selected.count)"))
                 .font(AppFonts.body(15))
@@ -200,6 +201,7 @@ struct KitchenView: View {
                     .contentShape(Rectangle())
                     .gesture(DragGesture(minimumDistance: 0)
                         .onChanged { value in
+                            if lastWashPoint == nil { model.speakWashingCueIfNeeded() }
                             if let lastWashPoint {
                                 let movement = hypot(value.location.x - lastWashPoint.x, value.location.y - lastWashPoint.y)
                                 model.washIngredients(distance: min(40, movement))
@@ -236,8 +238,7 @@ struct KitchenView: View {
                     .font(.system(size: 29))
                     .offset(y: -18)
             }
-            Text(model.kitchenSession.selected[model.kitchenSession.washedCount].emoji)
-                .font(.system(size: 50))
+            KitchenIngredientArt(ingredient: model.kitchenSession.selected[model.kitchenSession.washedCount], size: 76)
                 .offset(y: 53)
             if model.kitchenSession.waterTemperature == .warm {
                 HStack(spacing: 4) {
@@ -304,15 +305,15 @@ struct KitchenView: View {
             Button(action: cutNextIngredient) {
                 VStack(spacing: 12) {
                     Text("🔪").font(.system(size: 56))
-                    Text(model.kitchenSession.selected[min(model.kitchenSession.choppedCount, model.kitchenSession.selected.count - 1)].emoji)
-                        .font(.system(size: 90))
+                    KitchenIngredientArt(ingredient: model.kitchenSession.selected[min(model.kitchenSession.choppedCount, model.kitchenSession.selected.count - 1)], size: 112)
                     if isCutting {
                         HStack(spacing: 10) {
                             ForEach(0..<3, id: \.self) { index in
-                                Text(slicedFood)
-                                    .font(.system(size: 28))
-                                    .offset(x: showSlices ? CGFloat(index - 1) * 23 : 0, y: showSlices ? -18 : 20)
-                                    .opacity(showSlices ? 1 : 0)
+                                if let slicedFood {
+                                    KitchenIngredientArt(ingredient: slicedFood, size: 34)
+                                        .offset(x: showSlices ? CGFloat(index - 1) * 23 : 0, y: showSlices ? -18 : 20)
+                                        .opacity(showSlices ? 1 : 0)
+                                }
                             }
                         }
                         .frame(height: 35)
@@ -335,7 +336,7 @@ struct KitchenView: View {
 
     private func cutNextIngredient() {
         guard !isCutting else { return }
-        slicedFood = model.kitchenSession.selected[model.kitchenSession.choppedCount].emoji
+        slicedFood = model.kitchenSession.selected[model.kitchenSession.choppedCount]
         isCutting = true
         showSlices = false
         withAnimation(AppMetrics.spring) { showSlices = true }
@@ -354,8 +355,7 @@ struct KitchenView: View {
             if model.kitchenSession.stoveOn && !model.kitchenSession.ingredientsInPan {
                 Button { model.placeIngredientsInPan() } label: {
                     HStack(spacing: 10) {
-                        Text(model.kitchenSession.selected.map(\.emoji).joined(separator: " "))
-                            .font(.system(size: 30))
+                        KitchenIngredientRow(ingredients: model.kitchenSession.selected, size: 34)
                         Text(String(localized: "В сковороду"))
                             .font(AppFonts.action)
                             .foregroundStyle(AppColors.ink)
@@ -384,9 +384,7 @@ struct KitchenView: View {
         ZStack {
             art("kitchen_stove", width: 290, height: 260)
             if model.kitchenSession.ingredientsInPan {
-                Text(model.kitchenSession.selected.map(\.emoji).joined(separator: " "))
-                    .font(.system(size: 36))
-                    .lineLimit(1)
+                KitchenIngredientRow(ingredients: model.kitchenSession.selected, size: 42)
                     .offset(x: -20, y: -30)
             }
             if model.kitchenSession.stoveOn {
@@ -415,6 +413,10 @@ struct KitchenView: View {
                                     lastStirPoint = nil
                                     return
                                 }
+                                if model.kitchenSession.heatZone == .yellow && !didWarnForStirGesture {
+                                    model.speakLowHeatCueIfNeeded()
+                                    didWarnForStirGesture = true
+                                }
                                 if let lastStirPoint {
                                     let movement = hypot(value.location.x - lastStirPoint.x, value.location.y - lastStirPoint.y)
                                     model.stirPan(distance: min(40, movement))
@@ -424,6 +426,7 @@ struct KitchenView: View {
                             .onEnded { _ in
                                 lastStirPoint = nil
                                 stirPoint = nil
+                                didWarnForStirGesture = false
                             })
                 }
             }
@@ -431,6 +434,9 @@ struct KitchenView: View {
         .kitchenCard(tint: AppColors.background)
         .padding(.horizontal, 18)
         .accessibilityAction(named: Text(String(localized: "Перемешать"))) {
+            if model.kitchenSession.ingredientsInPan && model.kitchenSession.heatZone == .yellow {
+                model.speakLowHeatCueIfNeeded()
+            }
             model.stirPan(distance: 120)
         }
     }
@@ -461,7 +467,7 @@ struct KitchenView: View {
     private var heatLabel: String {
         if !model.kitchenSession.stoveOn { return String(localized: "Плита выключена") }
         switch model.kitchenSession.heatZone {
-        case .yellow: return String(localized: "🟡 Не готовится")
+        case .yellow: return String(localized: "🟡 Пока прохладно")
         case .green: return String(localized: "🟢 Готовится")
         case .red: return String(localized: "🔴 Слишком горячо")
         }
@@ -470,7 +476,7 @@ struct KitchenView: View {
     private var cookingHint: String {
         if !model.kitchenSession.stoveOn { return String(localized: "Сдвинь ползунок плиты") }
         if !model.kitchenSession.ingredientsInPan { return String(localized: "Положи продукты") }
-        if model.kitchenSession.heatZone == .yellow { return String(localized: "Жёлтый — не жарит") }
+        if model.kitchenSession.heatZone == .yellow { return String(localized: "Прибавь нагрев") }
         return String(localized: "Води лопаткой по сковороде")
     }
 
@@ -707,8 +713,38 @@ private struct StoveHeatSlider: View {
     }
 }
 
+struct KitchenIngredientArt: View {
+    let ingredient: Ingredient
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let image = ArtImage.named(ingredient.shopArtName) {
+                Image(uiImage: image).resizable().scaledToFit()
+            } else {
+                Text(ingredient.emoji).font(.system(size: size * 0.8))
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel(Text(ingredient.spokenName))
+    }
+}
+
+struct KitchenIngredientRow: View {
+    let ingredients: [Ingredient]
+    let size: CGFloat
+
+    var body: some View {
+        HStack(spacing: -5) {
+            ForEach(Array(ingredients.enumerated()), id: \.offset) { _, ingredient in
+                KitchenIngredientArt(ingredient: ingredient, size: size)
+            }
+        }
+    }
+}
+
 struct KitchenBowlIllustration: View {
-    let food: String
+    let ingredients: [Ingredient]
 
     var body: some View {
         ZStack {
@@ -719,10 +755,7 @@ struct KitchenBowlIllustration: View {
             } else {
                 Text("🥣").font(.system(size: 100))
             }
-            Text(food)
-                .font(.system(size: 27))
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
+            KitchenIngredientRow(ingredients: ingredients, size: 36)
                 .offset(y: -8)
         }
         .frame(maxWidth: 280)
@@ -781,6 +814,16 @@ private extension Ingredient {
         case .cheese: return "🧀"
         case .berry: return "🫐"
         case .herb: return "🌿"
+        case .apple: return "🍎"
+        case .pumpkin: return "🎃"
+        case .banana: return "🍌"
+        case .pear: return "🍐"
+        case .broccoli: return "🥦"
+        case .egg: return "🥚"
+        case .yogurt: return "🥛"
+        case .oats: return "🥣"
+        case .peas: return "🫛"
+        case .potato: return "🥔"
         }
     }
 
@@ -794,6 +837,16 @@ private extension Ingredient {
         case .cheese: return String(localized: "Сыр")
         case .berry: return String(localized: "Ягодки")
         case .herb: return String(localized: "Травка")
+        case .apple: return String(localized: "Яблоко")
+        case .pumpkin: return String(localized: "Тыква")
+        case .banana: return String(localized: "Банан")
+        case .pear: return String(localized: "Груша")
+        case .broccoli: return String(localized: "Брокколи")
+        case .egg: return String(localized: "Яйцо")
+        case .yogurt: return String(localized: "Йогурт")
+        case .oats: return String(localized: "Овсянка")
+        case .peas: return String(localized: "Горошек")
+        case .potato: return String(localized: "Картошка")
         }
     }
 }

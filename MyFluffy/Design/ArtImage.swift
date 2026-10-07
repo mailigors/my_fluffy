@@ -13,6 +13,10 @@ enum ArtImage {
         return image
     }
 
+    // Fitted art is converted to a much smaller transparent layer on first use.
+    // Keeping the original full-scene images in the shared cache wastes memory.
+    static func uncached(_ name: String) -> UIImage? { load(name) }
+
     static func frames(prefix: String) -> [UIImage] {
         if let cached = frameCache[prefix] {
             return cached

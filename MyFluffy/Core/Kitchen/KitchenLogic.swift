@@ -9,6 +9,9 @@ enum Ingredient: String, Codable, CaseIterable, Hashable, Sendable {
     case cheese = "ing_cheese"
     case berry = "ing_berry"
     case herb = "ing_herb"
+    case apple = "ing_apple", pumpkin = "ing_pumpkin", banana = "ing_banana"
+    case pear = "ing_pear", broccoli = "ing_broccoli", egg = "ing_egg"
+    case yogurt = "ing_yogurt", oats = "ing_oats", peas = "ing_peas", potato = "ing_potato"
 
     var satiety: Double {
         switch self {
@@ -18,6 +21,8 @@ enum Ingredient: String, Codable, CaseIterable, Hashable, Sendable {
         case .rice: return 10
         case .cheese: return 12
         case .berry, .herb: return 6
+        case .apple, .banana, .pear, .broccoli, .pumpkin, .peas: return 8
+        case .egg, .yogurt, .oats, .potato: return 10
         }
     }
 }
@@ -64,6 +69,12 @@ enum KitchenDishVisual {
         if picked.contains(.fish) { return "kitchen_dish_fish" }
         if picked.contains(.chicken) { return "kitchen_dish_chicken" }
         if picked.contains(.berry) { return picked.contains(.rice) ? "kitchen_dish_pie" : "kitchen_dish_milkshake" }
+        if picked.contains(.apple) || picked.contains(.pear) || picked.contains(.banana) {
+            return picked.contains(.yogurt) || picked.contains(.milk) ? "kitchen_dish_milkshake" : "kitchen_dish_pie"
+        }
+        if picked.contains(.pumpkin) || picked.contains(.potato) { return "kitchen_dish_soup" }
+        if picked.contains(.broccoli) || picked.contains(.peas) { return "kitchen_dish_salad" }
+        if picked.contains(.egg) || picked.contains(.yogurt) { return "kitchen_dish_dairy" }
         if picked.contains(.milk) || picked.contains(.cheese) { return "kitchen_dish_dairy" }
         if picked.contains(.carrot) || picked.contains(.herb) { return "kitchen_dish_salad" }
         return "kitchen_dish_mixed"

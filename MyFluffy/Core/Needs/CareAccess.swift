@@ -17,7 +17,7 @@ enum PetLook: Equatable, Sendable {
 }
 
 enum CareAccess {
-    static let happyDuration: TimeInterval = 2
+    static let happyDuration: TimeInterval = 12
 
     static func showsScale(_ need: Need, value: Double) -> Bool {
         value < 70
